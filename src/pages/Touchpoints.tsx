@@ -1,10 +1,8 @@
-import { Info } from 'lucide-react'
 import { PageHeader, SectionCard, Pill, Dot } from '@/components/primitives'
-import { useTouchpointTypes, useActivity, usePaycomBuild, buildingShortName } from '@/hooks/useData'
+import { useTouchpointTypes, useActivity, buildingShortName } from '@/hooks/useData'
 import { useScope } from '@/state/scope'
 import { jobBadge, jobDot, type Job } from '@/utils/ui'
 import { fmtDate } from '@/utils/date'
-import { cn } from '@/lib/utils'
 
 const JOBS: { job: Job; blurb: string }[] = [
   { job: 'Celebrate', blurb: 'Recognize the moments that build belonging. Fully automated.' },
@@ -71,7 +69,6 @@ function JourneyStrip() {
 
 export function Touchpoints() {
   const types = useTouchpointTypes().list()
-  const paycomBuild = usePaycomBuild().list()
   const { inScope, scopedBuildingId } = useScope()
   const activity = useActivity().list().filter((a) => inScope(a.buildingId))
 
@@ -103,18 +100,8 @@ export function Touchpoints() {
                     <div key={t.id} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
                       <p className="text-xs font-semibold text-slate-800">{t.name}</p>
                       <p className="mt-0.5 text-[11px] text-slate-500">{t.description}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-2">
                         <Pill className={jobBadge(job)}>{t.timing}</Pill>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
-                            t.confirm === 'Auto now'
-                              ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                              : 'bg-amber-50 text-amber-700 ring-amber-600/20',
-                          )}
-                        >
-                          {t.confirm}
-                        </span>
                       </div>
                     </div>
                   ))}
@@ -123,60 +110,6 @@ export function Touchpoints() {
             </div>
           )
         })}
-      </div>
-
-      {/* The build — what lives where in Paycom */}
-      <SectionCard
-        title="The build — what lives where in Paycom"
-        subtitle="The engine consolidates into Paycom, retiring the separate feedback tool"
-        className="mb-4"
-        bodyClassName="p-0"
-      >
-        <div className="overflow-x-auto scrollbar-thin">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2.5 font-medium">Touchpoint</th>
-                <th className="px-4 py-2.5 font-medium">How it lives in Paycom</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">What to confirm</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {paycomBuild.map((r) => (
-                <tr key={r.id} className="align-top">
-                  <td className="px-4 py-3 font-medium text-slate-800">{r.touchpoint}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.livesIn}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
-                        r.status === 'Auto now'
-                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                          : r.status === 'Confirm setup'
-                            ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                            : 'bg-slate-100 text-slate-600 ring-slate-500/20',
-                      )}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{r.confirm}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
-
-      <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>
-          <span className="font-semibold">One open question gates the Celebrate layer:</span> confirm with the Paycom rep
-          that it can auto-send a message on each person’s individual date and trigger anniversary surveys off each hire
-          date. If yes, the amber touchpoints are flip-a-switch; if no, a monthly date report feeds a building-leader
-          action list — either way the separate tool is retired.
-        </p>
       </div>
 
       <SectionCard title="Recent engine activity" subtitle="Automated touchpoints firing across the portfolio">

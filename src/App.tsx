@@ -5,8 +5,9 @@ import { ProfilePanelProvider } from '@/state/profilePanel'
 import { Login } from '@/components/Login'
 import { Layout } from '@/components/Layout'
 import { People } from '@/pages/People'
+import { Dashboard } from '@/pages/Dashboard'
+import { Rules } from '@/pages/Rules'
 import { Overview } from '@/pages/Overview'
-import { SaveLoop } from '@/pages/SaveLoop'
 import { Celebrate } from '@/pages/Celebrate'
 import { EmployeeDetail } from '@/pages/EmployeeDetail'
 import { Touchpoints } from '@/pages/Touchpoints'
@@ -23,9 +24,10 @@ function AppInner() {
       <Layout>
       <Routes>
         <Route path="/" element={<People />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/rules" element={<Rules />} />
         <Route path="/people/:id" element={<EmployeeDetail />} />
         <Route path="/pulse" element={<Overview />} />
-        <Route path="/save-loop" element={<SaveLoop />} />
         <Route path="/celebrate" element={<Celebrate />} />
         <Route path="/touchpoints" element={<Touchpoints />} />
         <Route path="/listening" element={<Listening />} />

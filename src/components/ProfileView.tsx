@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { SectionCard, Avatar, Pill } from '@/components/primitives'
 import { Ring } from '@/components/charts'
-import { useNewHires, useSurveys, useSaves, useBuildings } from '@/hooks/useData'
+import { useNewHires, useSurveys, useSaves, useInteractions, useBuildings } from '@/hooks/useData'
 import { useScope } from '@/state/scope'
 import { buildScore, BAND_META, scoreBarColor, type Band } from '@/utils/score'
 import { roleBadge, sentimentBadge, saveStatusBadge, saveStatusLabel, isOpenSave } from '@/utils/ui'
@@ -95,6 +95,7 @@ export function ProfileView({ id }: { id?: string }) {
   const hire = useNewHires().list().find((h) => h.id === id)
   const surveys = useSurveys().list().filter((s) => s.employeeId === id)
   const saves = useSaves().list().filter((s) => s.employeeId === id)
+  const interactions = useInteractions().list().filter((i) => i.employeeId === id)
   const building = useBuildings().list().find((b) => b.id === hire?.buildingId)
 
   if (!hire) return <p className="text-sm text-slate-500">Person not found.</p>
@@ -108,7 +109,7 @@ export function ProfileView({ id }: { id?: string }) {
     .filter((s) => s.status === 'completed')
     .sort((a, b) => a.deployedDate.localeCompare(b.deployedDate))
     .slice(-1)[0]
-  const sc = buildScore(hire, surveys, saves, scoreWeights)
+  const sc = buildScore(hire, surveys, saves, interactions, scoreWeights)
   const weak = sc.signals.filter((s) => s.value < 0.5)
 
   const events: Event[] = []

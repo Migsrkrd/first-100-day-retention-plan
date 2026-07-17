@@ -220,3 +220,11 @@ export interface Comment {
   text: string
   date: string
 }
+
+export interface Interaction {
+  id: string
+  employeeId: string
+  kind: 'manager' | 'leadership' | 'peer' | 'recognition' | 'reachout'
+  date: string
+  note: string
+}

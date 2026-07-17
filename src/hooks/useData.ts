@@ -19,6 +19,7 @@ import type {
   RoleRow,
   Ask,
   Comment,
+  Interaction,
 } from '@/types'
 
 export const usePortfolio = () => useTable<Portfolio>('portfolio')
@@ -40,6 +41,7 @@ export const useRollout = () => useTable<RolloutPhase>('rollout')
 export const useRoles = () => useTable<RoleRow>('roles')
 export const useAsks = () => useTable<Ask>('asks')
 export const useComments = () => useTable<Comment>('comments')
+export const useInteractions = () => useTable<Interaction>('interactions')
 
 // The single portfolio row — every screen reads the same headline stats.
 export function usePortfolioRow(): Portfolio | undefined {
@@ -52,7 +54,7 @@ export function useRoiRow(): Roi | undefined {
 
 // Non-reactive lookups for helpers that just need a name.
 export function buildingName(id: string): string {
-  if (id === 'portfolio') return 'All buildings'
+  if (id === 'portfolio') return 'Entire portfolio'
   return db.table<Building>('buildings').get(id)?.name ?? 'Unknown building'
 }
 

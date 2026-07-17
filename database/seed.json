@@ -2,7 +2,7 @@
   "portfolio": [
     {
       "id": "1",
-      "name": "Copper Hills Care Portfolio",
+      "name": "Copper Hills Care",
       "annualizedTurnover": 75.9,
       "priorTurnover": 82.0,
       "benchmark": 53.9,
@@ -267,5 +267,6 @@
   ],
   "comments": [
     { "id": "cm1", "employeeId": "e1", "author": "Priya Nair", "text": "Caught her before shift — schedule swap sorted for next two weeks. Recheck at 60-day.", "date": "2026-07-06" }
-  ]
+  ],
+  "interactions": []
 }

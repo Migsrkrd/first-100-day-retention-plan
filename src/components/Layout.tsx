@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
+  LayoutDashboard,
   Users,
-  HeartHandshake,
+  Workflow,
   HeartPulse,
   PartyPopper,
   Activity,
@@ -14,18 +15,20 @@ import {
   Building2,
   Network,
   Filter,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserMenu } from '@/components/UserMenu'
 import { ProfileDrawer } from '@/components/ProfileDrawer'
 import { useScope } from '@/state/scope'
-import { useBuildings, useNewHires, useSurveys, useSaves } from '@/hooks/useData'
+import { useBuildings, useNewHires, useSurveys, useSaves, useInteractions } from '@/hooks/useData'
 import { buildScore, NEEDS_ATTENTION } from '@/utils/score'
 import { TODAY, tenureDays } from '@/utils/date'
 
 const NAV = [
-  { to: '/', label: 'People', icon: Users, end: true },
-  { to: '/save-loop', label: 'Needs attention', icon: HeartHandshake, hero: true },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/', label: 'People', icon: Users, end: true, hero: true },
+  { to: '/rules', label: 'Rules Engine', icon: Workflow },
   { to: '/celebrate', label: 'Celebrate', icon: PartyPopper },
   { to: '/pulse', label: 'Pulse', icon: Activity },
   { to: '/touchpoints', label: 'Touchpoint Engine', icon: Sparkles },
@@ -40,6 +43,7 @@ function SaveBadge() {
   const hires = useNewHires().list()
   const surveys = useSurveys().list()
   const saves = useSaves().list()
+  const interactions = useInteractions().list()
   const count = hires
     .filter((h) => h.status === 'active' && inScope(h.buildingId) && tenureDays(h.hireDate) <= windowDays)
     .filter(
@@ -48,6 +52,7 @@ function SaveBadge() {
           h,
           surveys.filter((s) => s.employeeId === h.id),
           saves.filter((s) => s.employeeId === h.id),
+          interactions.filter((i) => i.employeeId === h.id),
           scoreWeights,
         ).score < NEEDS_ATTENTION,
     ).length
@@ -59,42 +64,12 @@ function SaveBadge() {
   )
 }
 
-// People Admin's facility filter; Building Admins are pinned, so this hides for them.
-function FacilityFilter() {
-  const { role, focusBuildingId, setFocusBuilding } = useScope()
-  const buildings = useBuildings().list()
-  if (role !== 'people-ops') return null
-  return (
-    <div className="relative">
-      <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-      <select
-        value={focusBuildingId ?? ''}
-        onChange={(e) => setFocusBuilding(e.target.value || null)}
-        title="Filter to a facility"
-        className="rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs font-medium text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-      >
-        <option value="">All buildings</option>
-        {buildings.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
 export function Layout({ children }: { children: ReactNode }) {
-  const { scopedBuildingId } = useScope()
+  const { role, scopedBuildingId, focusBuildingId, setFocusBuilding } = useScope()
   const buildings = useBuildings().list()
   const asOf = TODAY.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
-  // Single source of truth for "what am I looking at" — drives the header title.
   const scopedBuilding = scopedBuildingId ? buildings.find((b) => b.id === scopedBuildingId) : null
-  const title = scopedBuilding ? scopedBuilding.name : 'Copper Hills Care Portfolio'
-  const subtitle = scopedBuilding
-    ? `${scopedBuilding.city}, ${scopedBuilding.state} · as of ${asOf}`
-    : `All ${buildings.length} buildings · as of ${asOf}`
   const ScopeIcon = scopedBuilding ? Building2 : Network
 
   return (
@@ -136,17 +111,38 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Main column — the only scrolling region */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700">
-              <ScopeIcon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{title}</p>
-              <p className="truncate text-[11px] text-slate-400">{subtitle} · demo data</p>
+        <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700">
+            <ScopeIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {role === 'people-ops' ? (
+                <div className="relative">
+                  <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  <select
+                    value={focusBuildingId ?? ''}
+                    onChange={(e) => setFocusBuilding(e.target.value || null)}
+                    title="Which facilities you're viewing"
+                    className="rounded-lg border border-slate-200 bg-white py-1 pl-8 pr-2.5 text-sm font-semibold text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  >
+                    <option value="">Entire portfolio</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                  {scopedBuilding?.name}
+                  <Lock className="h-3 w-3 text-slate-400" />
+                </span>
+              )}
+              <span className="text-[11px] text-slate-400">· as of {asOf} · demo data</span>
             </div>
           </div>
-          <FacilityFilter />
         </header>
         <main className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="mx-auto w-full max-w-6xl px-5 py-6">{children}</div>

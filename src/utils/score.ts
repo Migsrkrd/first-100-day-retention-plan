@@ -1,4 +1,4 @@
-import type { NewHire, Survey, Save } from '@/types'
+import type { NewHire, Survey, Save, Interaction } from '@/types'
 import { computeSignal } from '@/utils/sentiment'
 import { tenureDays, daysBetween, parseDate, MILESTONES } from '@/utils/date'
 
@@ -83,10 +83,20 @@ export interface ScoreSignal {
   pts: number // weighted contribution, 0..100
   note: string
 }
+export type ActionKind = 'conversation' | 'manager' | 'leadership' | 'peer' | 'recognition' | 'reachout' | 'checkin'
 export interface Action {
   label: string
   why: string
   tone: 'urgent' | 'soon' | 'nice'
+  /** What clicking the action button does (records the touch that raises the score). */
+  does: ActionKind
+}
+
+/** Presentational urgency from waiting time — "before the next shift." */
+export function urgencyOf(waitingDays: number): { label: string; badge: string } | null {
+  if (waitingDays <= 0) return null
+  if (waitingDays >= 3) return { label: `${waitingDays}d overdue`, badge: 'bg-red-600 text-white ring-red-700/30' }
+  return { label: `${waitingDays}d untouched`, badge: 'bg-amber-100 text-amber-800 ring-amber-600/30' }
 }
 export interface ScoreResult {
   score: number
@@ -94,6 +104,8 @@ export interface ScoreResult {
   signals: ScoreSignal[]
   actions: Action[]
   log: LogEntry[]
+  /** Days the current concern has waited without a human touch (0 = touched / no concern). */
+  waitingDays: number
 }
 
 // Tiny deterministic RNG so each person's generated touches are stable.
@@ -113,7 +125,13 @@ function makeRng(seed: number) {
 }
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 
-export function buildScore(hire: NewHire, surveys: Survey[], saves: Save[], weights: ScoreWeights = DEFAULT_WEIGHTS): ScoreResult {
+export function buildScore(
+  hire: NewHire,
+  surveys: Survey[],
+  saves: Save[],
+  interactions: Interaction[] = [],
+  weights: ScoreWeights = DEFAULT_WEIGHTS,
+): ScoreResult {
   const day = tenureDays(hire.hireDate)
   const sig = computeSignal(hire, surveys)
   const concern = sig.state === 'negative' || sig.state === 'silent'
@@ -124,7 +142,7 @@ export function buildScore(hire: NewHire, surveys: Survey[], saves: Save[], weig
   log.push({ day: 1, form: 'welcome', title: 'Day-1 welcome sent', detail: 'First-shift welcome auto-sent.' })
   const milestonesPassed = MILESTONES.filter((m) => day >= m)
   // Recognition is held for at-risk people (the celebrate guard) — a belonging gap by design.
-  const recognitionSent = concern ? [] : milestonesPassed
+  let recognitionSent: number[] = concern ? [] : [...milestonesPassed]
   for (const m of recognitionSent) log.push({ day: m, form: 'recognition', title: `${m}-day milestone recognized`, detail: '“You made it” note sent.' })
 
   for (const sv of surveys) {
@@ -134,14 +152,17 @@ export function buildScore(hire: NewHire, surveys: Survey[], saves: Save[], weig
   }
 
   const managerDays: number[] = []
+  const leadershipDays: number[] = []
   let leadershipTouched = false
   for (const s of saves) {
     log.push({ day: s.dayInTenure, form: 'alert', title: `Save alert · ${s.assignedRole}`, detail: `${s.triggerType} came back ${s.triggerSentiment}` })
     if (s.status !== 'new') {
       const cday = s.conversationDate ? Math.max(s.dayInTenure, daysBetween(hire.hireDate, parseDate(s.conversationDate))) : s.dayInTenure
       const leader = s.assignedRole === 'DON' || s.assignedRole === 'Administrator'
-      if (leader) leadershipTouched = true
-      else managerDays.push(cday)
+      if (leader) {
+        leadershipTouched = true
+        leadershipDays.push(cday)
+      } else managerDays.push(cday)
       log.push({
         day: cday,
         form: leader ? 'leadership' : 'manager',
@@ -161,16 +182,52 @@ export function buildScore(hire: NewHire, surveys: Survey[], saves: Save[], weig
     const d = Math.min(day - 1, 25 + Math.floor(r() * 40))
     if (d >= 1 && d <= day) {
       leadershipTouched = true
+      leadershipDays.push(d)
       log.push({ day: d, form: 'leadership', title: 'Leadership outreach', detail: 'People Operations connected personally.' })
     }
   }
-  const buddy = r() < (concern ? 0.5 : 0.78)
+
+  let buddy = r() < (concern ? 0.5 : 0.78)
   if (buddy) log.push({ day: Math.min(day, 3), form: 'peer', title: 'Peer buddy assigned', detail: 'Paired with a unit buddy for the first 10 shifts.' })
-  const reachedOut = r() < (concern ? 0.25 : 0.4)
+  let reachedOut = r() < (concern ? 0.25 : 0.4)
   if (reachedOut) {
     const d = Math.min(day, 10 + Math.floor(r() * Math.max(1, day - 10)))
     log.push({ day: d, form: 'reachout', title: 'Reached out via Ask Here', detail: 'Asked a scheduling question — a sign the door feels open.' })
   }
+
+  // --- Logged interactions (action buttons persist these; they raise the score) ---
+  for (const it of interactions) {
+    const d = Math.min(day, Math.max(0, daysBetween(hire.hireDate, parseDate(it.date))))
+    if (it.kind === 'manager') {
+      managerDays.push(d)
+      log.push({ day: d, form: 'manager', title: 'Manager 1:1 logged', detail: it.note || 'Direct manager check-in.' })
+    } else if (it.kind === 'leadership') {
+      leadershipTouched = true
+      leadershipDays.push(d)
+      log.push({ day: d, form: 'leadership', title: 'Leadership outreach logged', detail: it.note || 'A leader connected.' })
+    } else if (it.kind === 'peer') {
+      buddy = true
+      log.push({ day: d, form: 'peer', title: 'Peer buddy assigned', detail: it.note || 'Paired with a unit buddy.' })
+    } else if (it.kind === 'recognition') {
+      recognitionSent = [...recognitionSent, d]
+      log.push({ day: d, form: 'recognition', title: 'Recognition sent', detail: it.note || 'Personal recognition sent.' })
+    } else if (it.kind === 'reachout') {
+      reachedOut = true
+      log.push({ day: d, form: 'reachout', title: 'Invited to Ask Here', detail: it.note || 'Door opened for feedback.' })
+    }
+  }
+
+  // --- Urgency: how long the current concern has waited without a human touch ---
+  let concernStart: number | null = null
+  if (sig.state === 'silent') concernStart = Math.max(0, day - sig.overdueDays)
+  else if (sig.state === 'negative' || sig.state === 'neutral') {
+    const bad = surveys
+      .filter((s) => s.status === 'completed' && (s.sentiment === 'negative' || s.sentiment === 'flat'))
+      .sort((a, b) => a.deployedDate.localeCompare(b.deployedDate))
+    if (bad.length) concernStart = Math.max(0, daysBetween(hire.hireDate, parseDate(bad[bad.length - 1].deployedDate)))
+  }
+  const touchDays = [...managerDays, ...leadershipDays]
+  const waitingDays = concernStart == null ? 0 : touchDays.some((d) => d >= concernStart!) ? 0 : Math.max(0, day - concernStart)
 
   log.sort((a, b) => b.day - a.day)
 
@@ -210,18 +267,18 @@ export function buildScore(hire: NewHire, surveys: Survey[], saves: Save[], weig
 
   // --- Suggested actions from weak signals ---
   const actions: Action[] = []
-  if (sig.state === 'negative') actions.push({ label: 'Have a stay conversation', why: raw.heard.note, tone: 'urgent' })
-  else if (sig.state === 'silent') actions.push({ label: 'Reach out — they’ve gone quiet', why: sig.detail, tone: 'urgent' })
-  if (manager < 0.5) actions.push({ label: 'Schedule a manager 1:1', why: raw.manager.note, tone: lastManager == null ? 'urgent' : 'soon' })
-  if (seen < 0.5 && sig.coverageDue > 0) actions.push({ label: 'Re-send the check-in', why: raw.seen.note, tone: 'soon' })
-  if (!leadershipTouched && (band === 'atrisk' || band === 'critical')) actions.push({ label: 'Loop in People Operations', why: 'At-risk with no leadership contact', tone: 'soon' })
-  if (!buddy) actions.push({ label: 'Assign a peer buddy', why: 'No buddy on record', tone: 'soon' })
-  if (!reachedOut && score < NEEDS_ATTENTION) actions.push({ label: 'Open a door — invite to Ask Here', why: 'Make it easy for them to reach back', tone: 'nice' })
+  if (sig.state === 'negative') actions.push({ label: 'Have a stay conversation', why: raw.heard.note, tone: 'urgent', does: 'conversation' })
+  else if (sig.state === 'silent') actions.push({ label: 'Reach out — they’ve gone quiet', why: sig.detail, tone: 'urgent', does: 'conversation' })
+  if (manager < 0.5) actions.push({ label: 'Log a manager 1:1', why: raw.manager.note, tone: lastManager == null ? 'urgent' : 'soon', does: 'manager' })
+  if (seen < 0.5 && sig.coverageDue > 0) actions.push({ label: 'Re-send the check-in', why: raw.seen.note, tone: 'soon', does: 'checkin' })
+  if (!leadershipTouched && (band === 'atrisk' || band === 'critical')) actions.push({ label: 'Loop in People Operations', why: 'At-risk with no leadership contact', tone: 'soon', does: 'leadership' })
+  if (!buddy) actions.push({ label: 'Assign a peer buddy', why: 'No buddy on record', tone: 'soon', does: 'peer' })
+  if (!reachedOut && score < NEEDS_ATTENTION) actions.push({ label: 'Open a door — invite to Ask Here', why: 'Make it easy for them to reach back', tone: 'nice', does: 'reachout' })
   if (concern && milestonesPassed.length > recognitionSent.length)
-    actions.push({ label: 'Recognize once stabilized', why: `Recognition held while at-risk (${milestonesPassed[milestonesPassed.length - 1]}-day milestone)`, tone: 'nice' })
+    actions.push({ label: 'Recognize once stabilized', why: `Recognition held while at-risk (${milestonesPassed[milestonesPassed.length - 1]}-day milestone)`, tone: 'nice', does: 'recognition' })
 
   const toneRank = { urgent: 0, soon: 1, nice: 2 }
   actions.sort((a, b) => toneRank[a.tone] - toneRank[b.tone])
 
-  return { score, band, signals, actions, log }
+  return { score, band, signals, actions, log, waitingDays }
 }

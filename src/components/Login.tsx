@@ -38,7 +38,7 @@ export function Login() {
   function signIn() {
     if (!selected) return
     login(selected)
-    navigate('/')
+    navigate('/dashboard')
   }
 
   return (

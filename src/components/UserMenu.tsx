@@ -14,7 +14,7 @@ export function UserMenu() {
   if (!session) return null
 
   const roleLabel = role === 'people-ops' ? 'People Admin' : 'Building Admin'
-  const scopeLabel = role === 'people-ops' ? 'Portfolio' : buildingShortName(session.buildingId ?? '')
+  const scopeLabel = role === 'people-ops' ? 'Entire portfolio' : buildingShortName(session.buildingId ?? '')
 
   function handleLogout() {
     setOpen(false)
