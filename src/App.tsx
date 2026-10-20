@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { ScopeProvider, useScope } from '@/state/scope'
 import { ProfilePanelProvider } from '@/state/profilePanel'
 import { Login } from '@/components/Login'
@@ -61,13 +61,12 @@ function useFavicon() {
   }, [])
 }
 
+// Platform's main.tsx already wraps App in a BrowserRouter, so render Routes directly.
 export default function App() {
   useFavicon()
   return (
     <ScopeProvider>
-      <BrowserRouter>
-        <AppInner />
-      </BrowserRouter>
+      <AppInner />
     </ScopeProvider>
   )
 }
