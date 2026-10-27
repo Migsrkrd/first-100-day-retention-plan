@@ -61,7 +61,6 @@ function useFavicon() {
   }, [])
 }
 
-// Platform's main.tsx already wraps App in a BrowserRouter, so render Routes directly.
 export default function App() {
   useFavicon()
   return (
