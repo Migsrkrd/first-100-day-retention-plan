@@ -4,3 +4,8 @@ dist
 .DS_Store
 tsconfig.tsbuildinfo
 tsconfig.node.tsbuildinfo
+
+# Clarity platform sync markers (not project source)
+.clarity-db-sync-hash
+.clarity-dependency-hash
+.clarity-project-files-hash
